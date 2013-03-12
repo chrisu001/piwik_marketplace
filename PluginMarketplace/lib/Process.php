@@ -10,10 +10,6 @@
  * @package  Piwik_PluginMarketplace
  */
 
-/**
- * Include the Cache
- */
-require_once __DIR__ . '/Cache.php';
 
 /**
  * Library: Process
@@ -69,7 +65,7 @@ class PluginMarketplace_Process implements Iterator
 
     /**
      * cache
-     * @var PluginMarketplace_Cache
+     * @var Piwik_CacheFile
      */
     protected $cache = null;
 
@@ -107,7 +103,7 @@ class PluginMarketplace_Process implements Iterator
     public function __construct(Piwik_CacheFile $cache = null)
     {
         if($cache === null) {
-            $cache =  new PluginMarketplace_Cache('PluginMarketplace');
+            $cache =  new Piwik_CacheFile('PluginMarketplace');
         }
         $this->cache = $cache;
         if (self::$instance === null) {
@@ -215,13 +211,13 @@ class PluginMarketplace_Process implements Iterator
         $this->markTaskProcessed($taskId,$nextStepId, $status);
         $this->taskStatus['tasks'][$taskId]['exception'] = $reason;
         $this->taskStatus['tasks'][$taskId]['errorcode'] =  $error_code;
-        return $this->heartbeat($taskId, 'exception: '.substr($reason,0,30));
+        return $this->heartbeat($taskId, 'exception: '.substr($reason, 0, 40));
     }
 
     /**
-     * mark task as processed
+     * mark task as processed and push it to the next step
      * @param string $taskId
-     * @param string $nextStepId
+     * @param int $nextStepId
      * @param int $status
      * @throws RuntimeException - if Task is unknown
      * @return PluginMarketplace_Process
@@ -253,7 +249,7 @@ class PluginMarketplace_Process implements Iterator
     {
         $this->loadStatus()->taskExists($taskId);
         $this->taskStatus['process']['sequence']++;
-        $this->taskStatus['tasks'][$taskId]['step'] = $nextStepId;
+        $this->taskStatus['tasks'][$taskId]['step']   = $nextStepId;
         $this->taskStatus['tasks'][$taskId]['status'] =  $status;
         return $this->heartbeat($taskId,'set step');
     }
@@ -309,7 +305,7 @@ class PluginMarketplace_Process implements Iterator
 
 
     /**
-     * check, if a task is running
+     * check, if a process is running
      * @return boolean
      */
     public function isRunning()
@@ -327,14 +323,21 @@ class PluginMarketplace_Process implements Iterator
 
     /**
      * check if the process is runable
-     * it it has tasks and the status of the process is ok
+     * it it has tasks 
+     * and 
+     *   the status of the process is finished/init
+     *  or 
+     *   the runninge task has died so restart 
+     * 
+     * @TODO: the runable status must be sharpened
      * @return boolean
      */
     public function isRunable()
     {
         $isRunning = $this->isRunning();
         $this->skipReloadCache = true;
-        return $this->hasTasks()  // must have tasks
+        $hasTasks =  $this->hasTasks();  // must have tasks
+        return $hasTasks         
         && ($this->taskStatus['process']['status'] === self::STATUS_INIT // proces is init or finished
                 || $this->taskStatus['process']['status'] === self::STATUS_FINISHED
                 // or process is running, but the heartbeart is too old
@@ -370,6 +373,7 @@ class PluginMarketplace_Process implements Iterator
 
     /**
      * save heartbeat with a message to the heartbeat indicator
+     * add the message and timing to the history 
      * @param string $taskId
      * @param string $historyMsg
      * @return PluginMarketplace_Process
@@ -398,33 +402,32 @@ class PluginMarketplace_Process implements Iterator
     protected function loadStatus()
     {
 
-        // skip (once) the load of the cace, for improvement of speed...
+        // skip (once) the load of the cache, for improvement of speed...
         if($this->skipReloadCache && !empty($this->taskStatus)) {
             $this->skipReloadCache = false;
             return $this;
         }
 
         $this->skipReloadCache = false;
-        $this->taskStatus = $this->cache->get(self::CACHE_ID_STATUS);
-        if(!empty($this->taskStatus)){
-            if(empty($this->taskStatus['tasks'])){
-                // reset arrayIterator
-                $this->currentTask= null;
-            }
-            return $this;
+        $cached = $this->cache->get(self::CACHE_ID_STATUS);
+        if(!$cached && $cached['ttl'] > time() || !($this->taskStatus = $cached['data']))  {
+            // create default array to represent the current status
+            $this->taskStatus=array(
+                    'process' => array(
+                            'startts' => -1,
+                            'heartbeat' => -20,
+                            'endts' => -1,
+                            'sequence' => 0,
+                            'status' => self::STATUS_INIT,
+                            'history' => array()),
+                    'tasks' => array()
+            );
+            $this->saveStatus();
         }
-        // create default array to represent the current status
-        $this->taskStatus=array(
-                'process' => array(
-                        'startts' => -1,
-                        'heartbeat' => -20,
-                        'endts' => -1,
-                        'sequence' => 0,
-                        'status' => self::STATUS_INIT,
-                        'history' => array()),
-                'tasks' => array()
-        );
-        $this->currentTask = null;
+        if(empty($this->taskStatus['tasks'])){
+            // reset arrayIterator
+            $this->currentTask= null;
+        }
         return $this;
     }
 
@@ -435,7 +438,7 @@ class PluginMarketplace_Process implements Iterator
      */
     protected function saveStatus()
     {
-        $this->cache->set(self::CACHE_ID_STATUS, $this->taskStatus);
+        $this->cache->set(self::CACHE_ID_STATUS, array('ttl' => time() + self::CACHE_TTL, 'data' => $this->taskStatus));
         return $this;
     }
 

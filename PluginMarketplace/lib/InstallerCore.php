@@ -213,7 +213,7 @@ class PluginMarketplace_InstallerCore
         $pluginName = $this->getPluginName();
         Piwik_Config::getInstance()->clear();
         try {
-            Piwik_PluginsManager::getInstance()->deactivatePlugin($pluginName());
+            Piwik_PluginsManager::getInstance()->deactivatePlugin($pluginName);
         } catch (Exception $e) {
             // fetch the "already deactivated" exception silently
             if(!strstr($e->getMessage(),'already')) {

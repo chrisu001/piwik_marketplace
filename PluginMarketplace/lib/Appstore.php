@@ -10,25 +10,17 @@
  * @package  Piwik_PluginMarketplace
  */
 
-/**
- * Include the ocherstra
- */
-require_once __DIR__ . '/Manager.php';
-require_once __DIR__ . '/Http.php';
-require_once __DIR__ . '/Downloader.php';
-require_once __DIR__ . '/Installer.php';
-require_once __DIR__ . '/Cache.php';
-
 
 /**
  * Library: Appstore
  *
- * this class handles all connection (api-calls) to the pluginstore:
- * http://
- * - remote update of Piwik-Plugins
- * - new tab Settings->Pluginstore
- * - upload own zip-filed plugins
- *  *
+ * this class handles all connection (api-calls) to the marketplace:
+ * http://plugin.suenkel.org
+ * 
+ * - get a list of available plugins with its meta-information
+ * - register this Instance of Piwik with an unique ID 
+ * - get current news (rss)
+ *  
  * @package Piwik_PluginMarketplace
  * @subpackage lib
  */
@@ -85,7 +77,7 @@ class PluginMarketplace_Appstore
 
     /**
      * cache the listed Plugins
-     * @var PluginMarketplace_Cache
+     * @var Piwik_CacheFile
      */
     protected $cache = null;
 
@@ -100,8 +92,7 @@ class PluginMarketplace_Appstore
         if($appurl !== null ) {
             $this->appstoreUrl = $appurl;
         }
-        $this->cache = new PluginMarketplace_Cache(self::CACHE_NAMESPACE);
-        $this->cache->setCacheTTL( 3600 );
+        $this->cache = new Piwik_CacheFile(self::CACHE_NAMESPACE);
     }
 
 
@@ -155,18 +146,17 @@ class PluginMarketplace_Appstore
 
 
     /**
-     * register my config
-     * send the curently installed plugins to the appstore
-     * SMELL: needs Manager to retreive the current Plugins
+     * Submit all "non-standard"-plugins to the appstore,
+     * to calculate dependencies and individual update-information
+     * later - reminder per email?
      *
      * @return array - response of the API (success/failed)
      */
-    public function registerConfig()
+    public function registerConfig($listOfPlugins)
     {
-        $manager = new PluginMarketplace_Manager();
-        $query = array('config' => $manager->getLocalPlugins());
+        $query = array('config' => $listOfPlugins);
         $this->isRegistered = true;
-        return $this->callApi('config', $query, 'POST');
+        return $this->callApi('config', $query);
     }
 
 
@@ -201,23 +191,19 @@ class PluginMarketplace_Appstore
     public function listPlugins()
     {
         $uid = $this->getUid();
-        if(false && $cached = $this->cache->get($uid.$this->release)){
-            //FIXME: no cache while development
-            return $cached;
+        
+        if(false //FIXME: no cache while development 
+        && ($cached = $this->cache->get($uid.$this->release)) 
+        && $cached['ttl'] < time() ) {
+            return $cached['data'];
         }
+        
         $response = $this->callApi('listplugins',array('release' => $this->release));
-        if($response['error'] && $response['code'] == 300) {
-            // register my plugins at first
-            if($this->isRegistered) {
-                throw new PluginMarketplace_Appstore_Exception('piwik instance could not register', self::ERROR_API);
-            }
-            $this->registerConfig();
-            return $this->listPlugins();
-        }
         if(empty($response['plugins'])) {
             $response['plugins'] = array();
+        } else {
+            $this->cache->set($uid.$this->release,array('ttl' => time() + 3600, 'data' => $response['plugins']));
         }
-        $this->cache->set($uid.$this->release, $response['plugins']);
         return $response['plugins'];
     }
 
@@ -233,39 +219,43 @@ class PluginMarketplace_Appstore
     {
         try {
             $plugin = $this->getPluginInfo($pluginName);
-            return $plugin['download_url'];
         } catch(Exception $e) {
             throw new PluginMarketplace_Appstore_APIError_Exception(Piwik_TranslateException('APUA_Exception_Appstore_nodonwloadlink'), self::ERROR_API, $e);
         }
+        return $plugin['download_url'];
     }
 
 
     /**
      * Get the news feed of the Appstore
      * @param string $url
-     * @throws Zend_Feed_Exception - if the feed could not be loaded
      * @return mixed - newsfeed
      */
     public function getRss($url = '/wordpress/?feed=rss2')
     {
 
         $rssUrl = $this->appstoreUrl. $url;
-        if('live' == 'jenkins') { $rssUrl = 'http://plugin.suenkel.org' . $url; }
+        if('live' == 'jenkins') {
+            $rssUrl = 'http://plugin.suenkel.org' . $url;
+        }
         $cached = $this->cache->get('rssfeed'.$url);
-        if($cached) {
-            return $cached;
+        if($cached && $cached['ttl'] < time() ) {
+            return $cached['data'];
         }
 
         // get the Feed
         $retVal = array();
-        $rss = Zend_Feed::import($rssUrl);
-        
+        try {
+            $rss = Zend_Feed::import($rssUrl);
+        } catch (Exception $e) {
+            return array();
+        }
         $maxEntries = 4;
         foreach($rss as $post)
         {
             // fix target-href
             $description = preg_replace('#href="#','target="_blank" href="', $post->description());
-            
+
             $retVal[] = array(
                     'title'       => $post->title(),
                     'date'        => @strftime("%B %e, %Y", strtotime($post->pubDate())),
@@ -278,7 +268,7 @@ class PluginMarketplace_Appstore
                 break;
             }
         }
-        $this->cache->setCacheTTL(8600 * 2)->set('rssfeed'.$url, $retVal);
+        $this->cache->set('rssfeed'.$url, array('ttl'=> time() + 86400 , 'data'=> $retVal));
         return $retVal;
     }
 
@@ -366,6 +356,7 @@ class PluginMarketplace_Appstore
      * @param array|null $params - params to be submitted
      * @param string - http method (GET/POST)
      * @throws PluginMarketplace_Appstore_Connection_Exception - if a connection or server error occurs
+     * @throws InvalidArgumentException - POST-mehtod not implemented yet by Piwik_Http
      * @return array - the response
      */
     protected function rawcallHTTP($method,array  $params, $httpmethod='GET')
@@ -374,10 +365,9 @@ class PluginMarketplace_Appstore
 
         try {
             if($httpmethod == 'POST') {
-                $remoteResult = PluginMarketplace_Http::postHttpRequest($url);
+                throw new InvalidArgumentException('Post not implemented yet :(');
             } else {
                 $remoteResult = Piwik_Http::sendHttpRequest($url, 10);
-
             }
         } catch(Exception $e) {
             // e.g., disable_functions = fsockopen; allow_url_open = Off

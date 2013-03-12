@@ -17,8 +17,6 @@ require_once __DIR__ . '/Appstore.php';
 require_once __DIR__ . '/Downloader.php';
 require_once __DIR__ . '/Installer.php';
 require_once __DIR__ . '/Process.php';
-// TODO: cache raus
-require_once __DIR__ . '/Cache.php';
 
 /**
  * Library: Manager
@@ -89,7 +87,7 @@ class PluginMarketplace_Manager {
 
     /**
      * cache
-     * @var PluginMarketplace_Cache
+     * @var Piwik_CacheFile
      */
     protected $cache = null;
 
@@ -107,8 +105,7 @@ class PluginMarketplace_Manager {
     public function __construct(Piwik_CacheFile $cache = null)
     {
         if($cache === null) {
-            $cache =  new PluginMarketplace_Cache('PluginMarketplace');
-            $cache->setCacheTTL(7200);
+            $cache =  new Piwik_CacheFile('PluginMarketplace');
         }
         $this->cache = $cache;
     }
@@ -513,7 +510,12 @@ class PluginMarketplace_Manager {
         $url = $proc->getTaskAttribute($pluginName,self::ATTR_URL);
         $filename = uniqid('download_');
         // defined ('IS_PHPUNIT') && printf("%s URL:%s  in \n%s\n",__METHOD__,$url, print_r($proc->getTaskAttribute($pluginName), true));
-        $filename = $downloader->download($url, $filename);
+        try {
+            $filename = $downloader->download($url, $filename);
+        } catch (PluginMarketplace_Downloader_Exception $e) {
+            $proc->markTaskFailed($pluginName, $e->getMessage());
+            return $this;
+        }
         // defined ('IS_PHPUNIT') && printf("%s  Filename  %s\n", __METHOD__,$filename);
         $proc->setTaskAttribute($pluginName, self::ATTR_ZIPFILENAME, $filename)
         ->markTaskProcessed($pluginName, self::STEP_EXTRACT);
@@ -577,8 +579,8 @@ class PluginMarketplace_Manager {
 
         // skip deactivate, if the plugin was not active, requested or the plugin is the PluginMarketplace
         if($proc->getTaskAttribute($pluginName,self::ATTR_SKIPDEACTIVATE)
-                || !$proc->getTaskAttribute($pluginName,self::ATTR_ISACITVE)
-                || $proc->getTaskAttribute ($pluginName,self::ATTR_NAME) == 'PluginMarketplace' ) {
+        || !$proc->getTaskAttribute($pluginName,self::ATTR_ISACITVE)
+        || $proc->getTaskAttribute ($pluginName,self::ATTR_NAME) == 'PluginMarketplace' ) {
             $proc->addTaskHistory($pluginName,'skip deaktivation')
             ->markTaskProcessed($pluginName, self::STEP_DEPLOY);
             return $this;
@@ -685,7 +687,7 @@ class PluginMarketplace_Manager {
             ->markTaskProcessed($pluginName, self::STEP_FINISHED);
             return $this;
         }
-        
+
         $realPluginName =  $proc->getTaskAttribute($pluginName, self::ATTR_REALNAME);
         if(!$realPluginName) {
             // fallback

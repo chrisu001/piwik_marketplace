@@ -15,7 +15,7 @@
  *
  * this class handles
  * - donwloading zip files via http-connection
- * - extracting the zip-files
+ * - extracting the zip-files in tmp-space
  *
  * @package Piwik_PluginMarketplace
  * @subpackage lib
@@ -50,7 +50,7 @@ class PluginMarketplace_Downloader
 
     /**
      * Classconstructor
-     * optional with a relative path to be set as bas
+     * optional with a relative path to be set as temporary base-path within PIWIK_USER_PATH
      * @param string|null $downloadRelativePath - path below PIWIK_USER_PATH
      */
     public function __construct($downloadRelativePath = null)
@@ -85,7 +85,7 @@ class PluginMarketplace_Downloader
     /**
      * Download a File (url) via http and store it to the filename
      * @param string $url
-     * @param string $filename - filename -relative to PIWIK_USER_PATH/$workspace/
+     * @param string $filename - filename - path to the filename PIWIK_USER_PATH/$workspace/$filename
      * @return string
      */
     public function download($url, $filename = null)
@@ -122,20 +122,37 @@ class PluginMarketplace_Downloader
     /**
      * check the file integrity
      * - size, existance, readable...
+     *
+     * @param string $mdSignature - signature
      * @throws RuntimeException - if the file is not usable
      * @return PluginMarketplace_Downloader
      */
-    protected function checkFile()
+    protected function checkFile($mdSignature = null)
     {
         if($this->filename === null
-                ||  !file_exists($this->filename)
-                || !is_readable($this->filename)){
+        || !file_exists($this->filename)
+        || !is_readable($this->filename)){
             throw new RuntimeException(Piwik_TranslateException('APUA_Exception_Downlaod_notexist', $this->filename));
         }
         if( filesize ($this->filename) < 200 ){
             throw new RuntimeException(Piwik_TranslateException('APUA_Exception_Download_toosmall', $this->filename));
         }
-        //TODO: check signature, if available
+        if($mdSignature 
+        && function_exists('md5_file') 
+        && $mdSignature != md5_file($this->filename)) {
+            throw new PluginMarketplace_Downloader_Exception(Piwik_TranslateException('APUA_Exception_Download_signature', $this->filename));
+        }
+        
+        if(!function_exists('finfo_open')) { 
+            return $this;
+        }
+
+        $arrayZips = array("application/zip", "application/x-zip", "application/x-zip-compressed");
+        $finfo = finfo_open(FILEINFO_MIME_TYPE); // return mime type ala mimetype extension
+        $filetype = finfo_file($finfo, $this->filename);
+        if(!in_array($filetype, $arrayZips)) {
+            throw new PluginMarketplace_Downloader_Exception(Piwik_TranslateException('APUA_Exception_Download_nozip', $this->filename));
+        }
         return $this;
     }
 
@@ -153,7 +170,7 @@ class PluginMarketplace_Downloader
         if( $relativePath == null ){
             $relativePath = 'extracted';
         }
-        // @SMELL: check path ".." ?
+        $relativePath = basename($relativePath);
         $zipfilename = $this->getFilename();
 
         // calculate path to extract
@@ -170,11 +187,11 @@ class PluginMarketplace_Downloader
         $archive = Piwik_Unzip::factory('PclZip', $this->getFilename());
 
         if ( 0 == ($archive_files = $archive->extract($realpath) ) ){
-            throw new RuntimeException(Piwik_TranslateException('APUA_Exception_Download_ArchiveIncompatible', $archive->errorInfo()));
+            throw new PluginMarketplace_Downloader_Exception(Piwik_TranslateException('APUA_Exception_Download_ArchiveIncompatible', $archive->errorInfo()));
         }
 
         if ( 0 == count($archive_files) ){
-            throw new Exception(Piwik_TranslateException('APUA_Exception_Download_ArchiveEmpty'));
+            throw new PluginMarketplace_Downloader_Exception(Piwik_TranslateException('APUA_Exception_Download_ArchiveEmpty'));
         }
 
         foreach($archive_files as $archive_file) {
@@ -186,7 +203,7 @@ class PluginMarketplace_Downloader
         return $this->extracted;
     }
 
-    
+
 
     /**
      * unlink all temporary files (donwload and extract dir)
@@ -197,8 +214,8 @@ class PluginMarketplace_Downloader
     {
         // unlink downloadfile
         if($this->filename != null
-                && file_exists($this->filename)
-                && !unlink($this->filename))
+        && file_exists($this->filename)
+        && !unlink($this->filename))
         {
             throw new RuntimeException(Piwik_Translate('APUA_Exception_Download_unlink', $this->filename));
         }
@@ -225,7 +242,7 @@ class PluginMarketplace_Downloader
     */
     /**
      * get the realpath of the processed file
-     * @throws RuntimeException - if the file is not available
+     * @throws RuntimeException - if the file is not available/no zipfile etc
      * @return string
      */
     public function getFilename()
@@ -271,13 +288,12 @@ class PluginMarketplace_Downloader
      */
     public function setextractedPath($absolutePath)
     {
-        // SMELL: dangourous
         $this->extracted = $absolutePath;
         return $this;
     }
 
 
-    
+
     /**
      * set the downloadbasdir within PIWIK_USER_PATH
      * @param string $downloadRelativePath
@@ -285,7 +301,6 @@ class PluginMarketplace_Downloader
      */
     public function setWorkspace($downloadRelativePath = null){
 
-        // @SMELL: check Dir against ".." etc
         if($downloadRelativePath === null) {
             $downloadRelativePath=self::PATH_TO_DOWNLOAD;
         }
@@ -296,3 +311,15 @@ class PluginMarketplace_Downloader
         return $this;
     }
 }
+
+
+/**
+ * Exception
+ *
+ * thrownon errors, that could be forwarded to the customer
+ *
+ * @package Piwik_PluginMarketplace
+ * @subpackage lib
+ */
+class PluginMarketplace_Downloader_Exception extends RuntimeException {};
+

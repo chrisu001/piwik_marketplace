@@ -19,9 +19,10 @@ require_once __DIR__ . DIRECTORY_SEPARATOR .'InstallerCore.php';
  * this class handles
  * - deployment (copy) a plugin from its tmp(download) path to the piwik instance
  * - basic verify the plugin
- *  derived form Installer Core
+ *  derived form Installer Core as Facade to Piwik_PluginsManager
  * - activate/deactivate
- * - remove Plugin
+ * - @TODO: forceinstall - install with database updates
+ * - remove Plugin (experimental)
  *
  * @package Piwik_PluginMarketplace
  * @subpackage lib
@@ -110,7 +111,6 @@ class PluginMarketplace_Installer extends PluginMarketplace_InstallerCore
         $phpclassfilename = $this->getPluginPHPClassFilename();
         if(function_exists('php_check_syntax') && !php_check_syntax( $phpclassfilename )) {
             $this->status = self::STATUS_FAILED;
-            //TODO: Loca
             throw new PluginMarketplace_Installer_Exception(Piwik_TranslateException('APUA_Exception_Install_noplugfile',htmlentities($phpclassfilename)));
         }
         $this->status = self::STATUS_VERIFIED;
@@ -121,6 +121,7 @@ class PluginMarketplace_Installer extends PluginMarketplace_InstallerCore
     /**
      * deploy the plugin
      * copy the plugin-dir to Piwik
+     * 
      * @throws PluginMarketplace_Installer_Exception - if status was "failed"
      * @return PluginMarketplace_Installer
      */
@@ -156,7 +157,7 @@ class PluginMarketplace_Installer extends PluginMarketplace_InstallerCore
         if($this->status < self::STATUS_DEPLOYED) {
             $this->deploy();
         }
-        // at the moment, we have noting to do, because of "autoloaders" in Piwik
+        // at the moment, we have nothing to do, because of "autoloaders"
         $this->postverify();
         $this->status = self::STATUS_INSTALLED;
         return $this;
@@ -177,7 +178,6 @@ class PluginMarketplace_Installer extends PluginMarketplace_InstallerCore
         $targetDir= PIWIK_INCLUDE_PATH . DIRECTORY_SEPARATOR . 'plugins' . DIRECTORY_SEPARATOR . $this->getPluginName() . DIRECTORY_SEPARATOR;
         if(!is_dir($targetDir)) {
             $this->status = self::STATUS_FAILED;
-            // TODO: change Loca-key to naming conv
             throw new PluginMarketplace_Installer_Exception(Piwik_TranslateException('PluginMarketplace_ExceptionInstall_nopostplugdir',htmlentities($targetDir)));
         }
         return $this;
