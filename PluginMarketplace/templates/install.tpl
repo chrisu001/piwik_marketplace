@@ -9,7 +9,7 @@ div.updateerror {
     padding: 3px;
 }
 
-div.updateprogress {
+table.updateprogress {
 	margin-left:100px;
 	marign-top: 5px;
 }
@@ -29,14 +29,18 @@ div#ready {
  }
 </style>
 {/literal}
-<script src="plugins/PluginMarketplace/templates/js/script.js"></script>
+<script
+	type="text/javascript"
+	src="plugins/PluginMarketplace/templates/js/jquery.progressbar.min.js?cb=42"></script>
+<script src="plugins/PluginMarketplace/templates/js/script.js?cb=42"></script>
+
 
 <div style="max-width: 980px;">
 <h2>{'APUA_Install_Title'|translate}</h2>
 <div class='entityContainer'>
 <div id="progressupdateinfo"><img src="plugins/PluginMarketplace/templates/img/ajax-loader.gif"></div>
 <div id="ready">
-<div id="readyloader" style="display: none;"><img src="plugins/PluginMarketplace/templates/img/ajax-loader.gif"></div>
+<div id="readyloader"><img src="plugins/PluginMarketplace/templates/img/ajax-loader.gif" width="100"></div>
 <div id="readybutton" style="display: none;"><a href='index.php?module=PluginMarketplace&action=index&{$commonquery.query}#pstabs-2' class="submit" style="color:#FFF;text-decoration:none">{'APUA_Btn_Finish'|translate}</a></div>
 </div>
 </div>
@@ -49,102 +53,6 @@ div#ready {
 <div id="htmlerror" style="display:none">Exception</div>
 {literal}
 <script type="text/javascript">
-  
- PollStatus = {
-
-		  pollCounter : 180,
-		  timerInterval: null,
-		  failCounter: 5,
-		  failsafeCounter: 3,
-		  isPolling: false,
-		  isRunable: false,
-
-
-		  update : function () {
-			    if(this.isPolling) {
-			    	return;
-			    }
-			    this.isPolling = true;
-			    this.pollCounter--;
-			    $('#ready').hide();
-			    var response = UpdateManager.status();
-
-			    if(typeof(response) !== 'undefined' && response == -1) {
-				    // htmlerror execption();
-				    this.finish();
-				    //FIXME: other "function"
-			    }
-			    // no valid ajax call, redo
-			    if(typeof(response) === 'undefined' || response === null || typeof(response.items) === 'undefined'){
-				      this.failCounter --;
-				      this.isPolling = false;
-			    	  return;
-			      }
-
-			      
-			        var len = 0;
-				    for (var i in response.items) len++;
-				    if(len === 0) { 
-			    	  console.log('update()','failed',response.items);
-		    	      this.isPolling = false;
-					  this.failCounter--;
-					  return;
-				    }
-			    // securely 2 times update status, before acapting the isRunnings status as valid 
-			    // cause of timing fallbacks 
-			    if(this.failsafeCounter > 0 || response.isRunning) {
-			    	this.failsafeCounter--;
-			    	ProcessDisplay.applyStatus(response);
-		    	    this.isPolling = false;
-		    	    return;
-			    }
-			    console.log('update()','normal Op');
-			    this.failsafeCounter = -1 ;
-			    if(!response.isRunning){
-			    	  ProcessDisplay.applyStatus(response);
-				      this.finish();
-				      return;
-			    }
-		    	ProcessDisplay.applyStatus(response);
-	    	    this.isPolling = false;
-		  },
-
-		  run: function () {
-			  if(this.timerInterval == null) {
-				  if(this.isRunable) {
-					  UpdateManager.run();
-				  }
-              	  $('#ready').hide();
-				  this.timerInterval=setInterval(function() { PollStatus.run(); } , 1000 * 1);
-				  return; 
-			  }
-
-			  if(this.failCounter < 0 || this.pollCounter < 0) {
-				  this.finish();
-			  }
-			  this.update();
-		  },
-
-		  finish: function () {
-			  if(this.timerInterval != null) {
-				  this.pollCounter = -1 ;
-				  clearInterval(this.timerInterval);
-			  }
-			  // run Postinstall
-			  // TODO: show balken
-			  $('#ready').show();
-			  // $('#readyloader').show();
-			  if(this.isRunable) {
-			    var response = UpdateManager.postinstall();
-			    // console.log('postupdate::finish()',response);
-			    ProcessDisplay.reset(response);
-			  }
-			  $('#readyloader').hide();
-			  $('#readybutton').show();
-          	  var url=$('#readybutton a').attr('href');
-          	  // setTimeout("location.href = '" + url + "';", 1000 * 10);
-		  }
-  };
 
 
   $(document).ready(function() {
