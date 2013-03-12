@@ -382,14 +382,18 @@ class Piwik_PluginMarketplace_Controller extends Piwik_Controller_Admin
                 'items' => array());
 
         // status of the tasks (each plugin has its own install-task)
+        $id = 1;
+        ksort($mapStatus['tasks']);
         foreach($mapStatus['tasks'] as $pluginName => $task) {
             $info=$task['info'];
             //@see Manager::ERR_*
             $exception = isset($task['errorcode']) ? Piwik_Translate('APUA_Process_Error_' .$task['errorcode']):'';
             $name = $info[PluginMarketplace_Manager::ATTR_NAME];
             $item = array(
+                    'id'          => $id, 
                     'name'        => $name,
                     'step'        => Piwik_Translate('APUA_STEP_'. $task['step']),
+                    'progress'    => max(0,min(100,intVal(100 * $task['step'] / 8))), 
                     'status'      => Piwik_Translate('APUA_STATUS_'. $task['status']),
                     'skipinstall' => empty($info[PluginMarketplace_Manager::ATTR_SKIPINSTALL]) ? false : true,
                     'statuscode'  => $task['status'],
@@ -397,6 +401,7 @@ class Piwik_PluginMarketplace_Controller extends Piwik_Controller_Admin
                     'errorcode'   => empty($task['errorcode']) ? 0 : $task['errorcode'],
             );
             $status['items'][$name] = $item;
+            $id++;
         }
 
         // while Unittesting, add the full backendstatus
