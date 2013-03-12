@@ -33,7 +33,7 @@ class Piwik_PluginMarketplace extends Piwik_Plugin
                 'author'               => 'Christian Suenkel',
                 'author_homepage'      => 'http://www.suenkel.de/',
                 'homepage'             => 'http://plugin.suenkel.org/',
-                'version'              => '0.8',
+                'version'              => '0.9',
                 'translationAvailable' => true,
         );
     }
