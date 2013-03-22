@@ -5,7 +5,7 @@
 {if 'live' == 'jenkins'}{assign var="enabledebug" value=true}{/if}
 <script
 	type="text/javascript"
-	src="plugins/PluginMarketplace/templates/js/postmessage.js?cb=42"></script>
+	src="plugins/PluginMarketplace/templates/js/postmessage.js?cb=44"></script>
 
 
     {literal}

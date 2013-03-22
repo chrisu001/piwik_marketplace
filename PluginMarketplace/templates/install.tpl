@@ -31,8 +31,8 @@ div#ready {
 {/literal}
 <script
 	type="text/javascript"
-	src="plugins/PluginMarketplace/templates/js/jquery.progressbar.min.js?cb=42"></script>
-<script src="plugins/PluginMarketplace/templates/js/script.js?cb=42"></script>
+	src="plugins/PluginMarketplace/templates/js/jquery.progressbar.min.js?cb=44"></script>
+<script src="plugins/PluginMarketplace/templates/js/script.js?cb=44"></script>
 
 
 <div style="max-width: 980px;">
