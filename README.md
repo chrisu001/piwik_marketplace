@@ -20,27 +20,22 @@ This plugin provides access to the [alternative marketplace](http://plugin.suenk
 
 ### Changelog
 
-> v1.0    (2013-11-04)
-> -------------------
->  * prepare upcoming Piwik version 2.0
->  * major code cleanup
->  * add features  (sort plugins, use piwik_version as filter of compatible plugins,...)
-> v0.9.3   (2013-09-20)
-> -------------------
->  * fix cache support php 5.5
->  * minor code-cleanup
-> v0.9.2   (2013-06-21)
-> -------------------
->  * support piwik version 1.12
->  * add piwik facade to be prepared for upcoming piwik version 2.0
->  * some minor fixes
-> v0.9   (2013-03-12)
-> -------------------
->  * add progressbar while installing
->  * remove copy&paste code
-> v0.8   (2012-12-01)
-> -------------------
->  * initial public release
+#### v1.0    (2013-11-04)
+  * prepare upcoming Piwik version 2.0
+  * major code cleanup
+  * add features  (sort plugins, use piwik_version as filter of compatible plugins,...)
+#### v0.9.3   (2013-09-20)
+  * fix cache support php 5.5
+  * minor code-cleanup
+#### v0.9.2   (2013-06-21)
+  * support piwik version 1.12
+  * add piwik facade to be prepared for upcoming piwik version 2.0
+  * some minor fixes
+#### v0.9   (2013-03-12)
+  * add progressbar while installing
+  * remove copy&paste code
+#### v0.8   (2012-12-01)
+  * initial public release
 
 
 ### Ressources
